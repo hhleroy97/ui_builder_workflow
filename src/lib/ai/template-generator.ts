@@ -1,6 +1,8 @@
 import { ProjectRequirements, GeneratedTemplate, ComponentDefinition, DesignTokens } from '@/types'
 import { ColorTheoryEngine } from '@/lib/color-theory'
 import { TypographyEngine } from '@/lib/design-system/typography'
+import { getIndustryContent, getIndustryServices, getIndustryTestimonials, getIndustryTeam, getIndustryPricing, getIndustryPortfolio } from '@/lib/content/industry-content'
+import { getContentStrategy, getAudienceModifiers, generatePersonalizedContent, generateCTAText, generateValuePropositions } from '@/lib/content/content-strategy'
 
 export class TemplateGenerator {
   /**
@@ -157,7 +159,7 @@ export class TemplateGenerator {
         id: 'button',
         name: 'Button',
         type: 'atom',
-        html: `<button class="btn btn-primary">{{text}}</button>`,
+        html: `<button class="btn btn-primary">Get Started</button>`,
         css: this.generateButtonCSS(designTokens),
         variants: [
           { name: 'primary', properties: { class: 'btn-primary' } },
@@ -169,7 +171,7 @@ export class TemplateGenerator {
         id: 'heading',
         name: 'Heading',
         type: 'atom',
-        html: `<h1 class="heading">{{text}}</h1>`,
+        html: `<h1 class="heading">Welcome to Our Platform</h1>`,
         css: this.generateHeadingCSS(designTokens),
         variants: [
           { name: 'h1', properties: { tag: 'h1' } },
@@ -209,19 +211,24 @@ export class TemplateGenerator {
     requirements: ProjectRequirements,
     designTokens: DesignTokens
   ): ComponentDefinition {
+    // Generate content based on industry and project type
+    const content = this.generateHeroContent(requirements)
+    
     const heroHTML = `
       <section class="hero">
         <div class="hero-container">
           <div class="hero-content">
-            <h1 class="hero-title">{{title}}</h1>
-            <p class="hero-subtitle">{{subtitle}}</p>
+            <h1 class="hero-title">${content.title}</h1>
+            <p class="hero-subtitle">${content.subtitle}</p>
             <div class="hero-actions">
-              <button class="btn btn-primary">{{primaryCTA}}</button>
-              <button class="btn btn-secondary">{{secondaryCTA}}</button>
+              <button class="btn btn-primary">${content.primaryCTA}</button>
+              <button class="btn btn-secondary">${content.secondaryCTA}</button>
             </div>
           </div>
-          <div class="hero-image">
-            <img src="{{heroImage}}" alt="{{heroImageAlt}}" />
+          <div class="hero-visual">
+            <div class="hero-placeholder" style="width: 100%; height: 300px; background: ${designTokens.colors.primary}20; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: ${designTokens.colors.primary};">
+              ${content.visualPlaceholder}
+            </div>
           </div>
         </div>
       </section>
@@ -229,8 +236,11 @@ export class TemplateGenerator {
 
     const heroCSS = `
       .hero {
-        padding: 4rem 1rem;
-        background: linear-gradient(135deg, ${designTokens.colors.primary}10, ${designTokens.colors.secondary}10);
+        padding: 5rem 1rem;
+        background: linear-gradient(135deg, ${designTokens.colors.primary}15, ${designTokens.colors.secondary}10);
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
       }
       
       .hero-container {
@@ -238,40 +248,72 @@ export class TemplateGenerator {
         margin: 0 auto;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 3rem;
+        gap: 4rem;
         align-items: center;
       }
       
+      .hero-content {
+        padding: 0;
+      }
+      
       .hero-title {
-        font-family: ${designTokens.typography.fontPairings.heading};
-        font-size: ${designTokens.typography.scale['5xl']};
+        font-family: ${designTokens.typography.fontPairings.heading}, serif;
+        font-size: clamp(2.5rem, 4vw, ${designTokens.typography.scale['6xl']});
         font-weight: 700;
         line-height: 1.1;
         margin-bottom: 1.5rem;
         color: ${designTokens.colors.primary};
+        letter-spacing: -0.02em;
       }
       
       .hero-subtitle {
+        font-family: ${designTokens.typography.fontPairings.body}, sans-serif;
         font-size: ${designTokens.typography.scale.xl};
         line-height: 1.6;
-        margin-bottom: 2rem;
-        color: #6b7280;
+        margin-bottom: 2.5rem;
+        color: #4b5563;
+        font-weight: 400;
       }
       
       .hero-actions {
         display: flex;
         gap: 1rem;
         flex-wrap: wrap;
+        margin-top: 0.5rem;
+      }
+      
+      .hero-visual {
+        position: relative;
+      }
+      
+      .hero-placeholder {
+        border: 2px dashed ${designTokens.colors.primary}40;
+        font-family: ${designTokens.typography.fontPairings.body}, sans-serif;
+        font-weight: 500;
+        background: linear-gradient(45deg, ${designTokens.colors.primary}08, ${designTokens.colors.secondary}12);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+      }
+      
+      .hero-placeholder:hover {
+        background: linear-gradient(45deg, ${designTokens.colors.primary}15, ${designTokens.colors.secondary}20);
+        transform: translateY(-2px);
       }
       
       @media (max-width: 768px) {
         .hero-container {
           grid-template-columns: 1fr;
+          gap: 2rem;
           text-align: center;
         }
         
-        .hero-title {
-          font-size: ${designTokens.typography.scale['3xl']};
+        .hero {
+          padding: 3rem 1rem;
+          min-height: auto;
+        }
+        
+        .hero-actions {
+          justify-content: center;
         }
       }
     `
@@ -355,12 +397,58 @@ export class TemplateGenerator {
     components: ComponentDefinition[],
     designTokens: DesignTokens
   ): Promise<string> {
-    const sections = requirements.requiredSections || []
+    // Get sections from requirements, or use default sections based on project type
+    let sections = requirements.requiredSections || []
+    
+    // If no sections specified, add default sections based on project type
+    if (sections.length === 0) {
+      const defaultSections = this.getDefaultSections(requirements.projectType || 'landing')
+      sections = defaultSections
+    }
+    
+    // Generate HTML for each section, prioritizing organism components
     const sectionHTML = sections.map(sectionId => {
-      const component = components.find(c => c.id === sectionId)
+      const component = components.find(c => c.id === sectionId && c.type === 'organism')
       return component?.html || ''
-    }).join('\n\n')
+    }).filter(html => html.trim() !== '').join('\n\n')
+    
+    // If no section HTML, generate a basic layout with all organism components
+    let bodyContent = sectionHTML
+    if (!bodyContent.trim()) {
+      const organismComponents = components.filter(c => c.type === 'organism' && c.html && c.html.trim() !== '')
+      bodyContent = organismComponents.map(c => c.html).join('\n\n')
+      
+      // If still no content, create a showcase of all components
+      if (!bodyContent.trim()) {
+        const templateName = this.generateTemplateName(requirements)
+        const templateDesc = this.generateDescription(requirements)
+        const primaryColor = designTokens.colors.primary
+        
+        const componentShowcase = components
+          .filter(comp => comp.html && comp.html.trim())
+          .map(comp => 
+            '<div style="margin-bottom: 2rem; padding: 2rem; border: 1px solid #e5e5e5; border-radius: 8px;">' +
+            `<h3 style="margin-bottom: 1rem; color: ${primaryColor};">${comp.name} Component</h3>` +
+            comp.html +
+            '</div>'
+          ).join('\n')
+        
+        bodyContent = `
+          <main style="padding: 2rem;">
+            <header style="text-align: center; margin-bottom: 3rem;">
+              <h1 style="color: ${primaryColor}; margin-bottom: 1rem;">${templateName}</h1>
+              <p style="color: #666; max-width: 600px; margin: 0 auto;">${templateDesc}</p>
+            </header>
+            <section style="max-width: 1200px; margin: 0 auto;">
+              ${componentShowcase}
+            </section>
+          </main>
+        `
+      }
+    }
 
+    const fontImports = this.generateFontImports(designTokens)
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -368,15 +456,115 @@ export class TemplateGenerator {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${requirements.industry} ${requirements.projectType}</title>
+    ${fontImports}
     <style>
         ${await this.generateCSS(designTokens, components)}
     </style>
 </head>
 <body>
-    ${sectionHTML}
+    ${bodyContent}
 </body>
 </html>
     `.trim()
+  }
+
+  /**
+   * Generate Google Fonts imports for the template
+   */
+  private static generateFontImports(designTokens: DesignTokens): string {
+    const headingFont = designTokens.typography.fontPairings.heading
+    const bodyFont = designTokens.typography.fontPairings.body
+    
+    // Create Google Fonts URL with proper weights
+    const fonts = new Set([headingFont, bodyFont])
+    const fontParams = Array.from(fonts).map(font => 
+      `${font.replace(/ /g, '+')}:300,400,500,600,700`
+    ).join('&family=')
+    
+    return `    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=${fontParams}&display=swap" rel="stylesheet">`
+  }
+
+  /**
+   * Generate hero content based on requirements
+   */
+  private static generateHeroContent(requirements: ProjectRequirements): any {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const ctaTexts = generateCTAText(requirements)
+    
+    // Get base content from industry library
+    const baseHeroContent = industryContent.hero
+    
+    // Apply personalization
+    const personalizedTitle = generatePersonalizedContent(baseHeroContent.title, requirements)
+    const personalizedSubtitle = generatePersonalizedContent(baseHeroContent.subtitle, requirements)
+
+    return {
+      title: personalizedTitle,
+      subtitle: personalizedSubtitle,
+      primaryCTA: ctaTexts.primary,
+      secondaryCTA: ctaTexts.secondary,
+      visualPlaceholder: baseHeroContent.visualPlaceholder
+    }
+  }
+
+  /**
+   * Generate about content based on requirements
+   */
+  private static generateAboutContent(requirements: ProjectRequirements): any {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const baseAboutContent = industryContent.about
+    
+    // Apply personalization and strategy-based modifications
+    const personalizedTitle = generatePersonalizedContent(baseAboutContent.title, requirements)
+    const personalizedDescription = generatePersonalizedContent(baseAboutContent.description, requirements)
+    
+    return {
+      title: personalizedTitle,
+      description: personalizedDescription,
+      feature1Title: baseAboutContent.feature1Title,
+      feature1Description: generatePersonalizedContent(baseAboutContent.feature1Description, requirements),
+      feature2Title: baseAboutContent.feature2Title,
+      feature2Description: generatePersonalizedContent(baseAboutContent.feature2Description, requirements),
+      feature3Title: baseAboutContent.feature3Title,
+      feature3Description: baseAboutContent.feature3Description ? generatePersonalizedContent(baseAboutContent.feature3Description, requirements) : undefined
+    }
+  }
+
+  /**
+   * Generate contact content based on requirements
+   */
+  private static generateContactContent(requirements: ProjectRequirements): any {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const baseContactContent = industryContent.contact
+    
+    const personalizedTitle = generatePersonalizedContent(baseContactContent.title, requirements)
+    const personalizedDescription = generatePersonalizedContent(baseContactContent.description, requirements)
+    
+    return {
+      title: personalizedTitle,
+      description: personalizedDescription,
+      phone: baseContactContent.phone,
+      email: baseContactContent.email,
+      address: baseContactContent.address
+    }
+  }
+
+  /**
+   * Get default sections based on project type
+   */
+  private static getDefaultSections(projectType: string): string[] {
+    const sectionMap = {
+      'landing': ['hero', 'about', 'services', 'contact'],
+      'portfolio': ['hero', 'about', 'portfolio', 'contact'],
+      'ecommerce': ['hero', 'services', 'portfolio', 'contact'],
+      'saas': ['hero', 'about', 'pricing', 'contact'],
+      'blog': ['hero', 'about', 'contact'],
+      'corporate': ['hero', 'about', 'services', 'team', 'contact']
+    }
+    
+    return sectionMap[projectType as keyof typeof sectionMap] || ['hero', 'about', 'contact']
   }
 
   /**
@@ -464,20 +652,22 @@ export class TemplateGenerator {
    * Generate about section component
    */
   private static generateAboutComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const content = this.generateAboutContent(requirements)
+    
     const aboutHTML = `
       <section class="about">
         <div class="about-container">
           <div class="about-content">
-            <h2 class="about-title">About Us</h2>
-            <p class="about-description">{{description}}</p>
+            <h2 class="about-title">${content.title}</h2>
+            <p class="about-description">${content.description}</p>
             <div class="about-features">
               <div class="feature">
-                <h3>{{feature1Title}}</h3>
-                <p>{{feature1Description}}</p>
+                <h3>${content.feature1Title}</h3>
+                <p>${content.feature1Description}</p>
               </div>
               <div class="feature">
-                <h3>{{feature2Title}}</h3>
-                <p>{{feature2Description}}</p>
+                <h3>${content.feature2Title}</h3>
+                <p>${content.feature2Description}</p>
               </div>
             </div>
           </div>
@@ -539,12 +729,14 @@ export class TemplateGenerator {
    * Generate contact section component
    */
   private static generateContactComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const content = this.generateContactContent(requirements)
+    
     const contactHTML = `
       <section class="contact">
         <div class="contact-container">
           <div class="contact-content">
-            <h2 class="contact-title">Get In Touch</h2>
-            <p class="contact-description">{{contactDescription}}</p>
+            <h2 class="contact-title">${content.title}</h2>
+            <p class="contact-description">${content.description}</p>
             <div class="contact-form">
               <form>
                 <div class="form-group">
@@ -632,23 +824,32 @@ export class TemplateGenerator {
    * Generate services section component
    */
   private static generateServicesComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const servicesContent = industryContent.services
+    
+    // Generate service cards HTML
+    const serviceCardsHTML = servicesContent.services.map(service => `
+      <div class="service-card">
+        <div class="service-icon">
+          <div class="icon-placeholder">${service.icon}</div>
+        </div>
+        <h3>${service.title}</h3>
+        <p class="service-description">${service.description}</p>
+        <ul class="service-features">
+          ${service.features.map(feature => `<li>${feature}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('')
+
     const servicesHTML = `
       <section class="services">
         <div class="services-container">
-          <h2 class="services-title">Our Services</h2>
+          <div class="services-header">
+            <h2 class="services-title">${servicesContent.title}</h2>
+            <p class="services-subtitle">${servicesContent.subtitle}</p>
+          </div>
           <div class="services-grid">
-            <div class="service-card">
-              <h3>{{service1Title}}</h3>
-              <p>{{service1Description}}</p>
-            </div>
-            <div class="service-card">
-              <h3>{{service2Title}}</h3>
-              <p>{{service2Description}}</p>
-            </div>
-            <div class="service-card">
-              <h3>{{service3Title}}</h3>
-              <p>{{service3Description}}</p>
-            </div>
+            ${serviceCardsHTML}
           </div>
         </div>
       </section>
@@ -657,6 +858,7 @@ export class TemplateGenerator {
     const servicesCSS = `
       .services {
         padding: 4rem 1rem;
+        background: ${designTokens.colors.neutral}05;
       }
       
       .services-container {
@@ -664,32 +866,106 @@ export class TemplateGenerator {
         margin: 0 auto;
       }
       
-      .services-title {
-        font-family: ${designTokens.typography.fontPairings.heading};
-        font-size: ${designTokens.typography.scale['3xl']};
-        color: ${designTokens.colors.primary};
+      .services-header {
         text-align: center;
         margin-bottom: 3rem;
       }
       
+      .services-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+      
+      .services-subtitle {
+        font-size: ${designTokens.typography.scale.lg};
+        color: #6b7280;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      
       .services-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 2rem;
       }
       
       .service-card {
-        padding: 2rem;
+        padding: 2.5rem;
         background: white;
         border-radius: ${designTokens.borderRadius.lg};
-        box-shadow: ${designTokens.shadows.md};
+        box-shadow: ${designTokens.shadows.sm};
         text-align: center;
+        border: 1px solid ${designTokens.colors.neutral}20;
+        transition: all 0.3s ease;
+      }
+      
+      .service-card:hover {
+        transform: translateY(-4px);
+        box-shadow: ${designTokens.shadows.lg};
+        border-color: ${designTokens.colors.primary}20;
+      }
+      
+      .service-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 1.5rem;
+        background: ${designTokens.colors.primary}10;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .icon-placeholder {
+        color: ${designTokens.colors.primary};
+        font-weight: bold;
+        font-size: 0.875rem;
       }
       
       .service-card h3 {
         font-family: ${designTokens.typography.fontPairings.heading};
         color: ${designTokens.colors.primary};
         margin-bottom: 1rem;
+        font-size: ${designTokens.typography.scale.xl};
+      }
+      
+      .service-description {
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+      
+      .service-features {
+        list-style: none;
+        padding: 0;
+        text-align: left;
+      }
+      
+      .service-features li {
+        padding: 0.5rem 0;
+        color: #374151;
+        position: relative;
+        padding-left: 1.5rem;
+      }
+      
+      .service-features li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: ${designTokens.colors.primary};
+        font-weight: bold;
+      }
+      
+      @media (max-width: 768px) {
+        .services-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .service-card {
+          padding: 2rem;
+        }
       }
     `
 
@@ -702,44 +978,626 @@ export class TemplateGenerator {
     }
   }
 
-  // Simple placeholder implementations for other components
+  /**
+   * Generate portfolio section component
+   */
   private static generatePortfolioComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const portfolioContent = industryContent.portfolio
+    
+    const portfolioItemsHTML = portfolioContent.projects.map(project => `
+      <div class="portfolio-item">
+        <div class="portfolio-image">
+          <div class="image-placeholder">${project.category}</div>
+        </div>
+        <div class="portfolio-content">
+          <div class="portfolio-meta">
+            <span class="portfolio-category">${project.category}</span>
+            ${project.metrics ? `<span class="portfolio-metric">${project.metrics}</span>` : ''}
+          </div>
+          <h3>${project.title}</h3>
+          <p>${project.description}</p>
+          <div class="portfolio-tags">
+            ${project.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('')
+
+    const portfolioHTML = `
+      <section class="portfolio">
+        <div class="portfolio-container">
+          <div class="portfolio-header">
+            <h2 class="portfolio-title">${portfolioContent.title}</h2>
+            <p class="portfolio-subtitle">${portfolioContent.subtitle}</p>
+          </div>
+          <div class="portfolio-grid">
+            ${portfolioItemsHTML}
+          </div>
+        </div>
+      </section>
+    `
+
+    const portfolioCSS = `
+      .portfolio {
+        padding: 4rem 1rem;
+      }
+      
+      .portfolio-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .portfolio-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+      
+      .portfolio-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+      
+      .portfolio-subtitle {
+        font-size: ${designTokens.typography.scale.lg};
+        color: #6b7280;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      
+      .portfolio-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 2rem;
+      }
+      
+      .portfolio-item {
+        background: white;
+        border-radius: ${designTokens.borderRadius.lg};
+        box-shadow: ${designTokens.shadows.sm};
+        overflow: hidden;
+        transition: transform 0.3s ease;
+      }
+      
+      .portfolio-item:hover {
+        transform: translateY(-4px);
+        box-shadow: ${designTokens.shadows.lg};
+      }
+      
+      .portfolio-image {
+        height: 200px;
+        background: linear-gradient(135deg, ${designTokens.colors.primary}20, ${designTokens.colors.secondary}20);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .image-placeholder {
+        color: ${designTokens.colors.primary};
+        font-weight: bold;
+        font-size: 1.125rem;
+      }
+      
+      .portfolio-content {
+        padding: 1.5rem;
+      }
+      
+      .portfolio-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      
+      .portfolio-category {
+        font-size: 0.875rem;
+        color: ${designTokens.colors.primary};
+        font-weight: 500;
+      }
+      
+      .portfolio-metric {
+        font-size: 0.875rem;
+        color: #059669;
+        font-weight: 500;
+      }
+      
+      .portfolio-content h3 {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 0.5rem;
+      }
+      
+      .portfolio-content p {
+        color: #6b7280;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+      }
+      
+      .portfolio-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      
+      .tag {
+        background: ${designTokens.colors.neutral}15;
+        color: ${designTokens.colors.primary};
+        padding: 0.25rem 0.5rem;
+        border-radius: ${designTokens.borderRadius.sm};
+        font-size: 0.75rem;
+      }
+    `
+
     return {
       id: 'portfolio',
       name: 'Portfolio Section',
       type: 'organism',
-      html: '<section class="portfolio"><h2>Portfolio</h2><div class="portfolio-grid">{{portfolioItems}}</div></section>',
-      css: '.portfolio { padding: 4rem 1rem; } .portfolio h2 { text-align: center; margin-bottom: 2rem; }'
+      html: portfolioHTML,
+      css: portfolioCSS
     }
   }
 
+  /**
+   * Generate testimonials section component
+   */
   private static generateTestimonialsComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const testimonialsContent = industryContent.testimonials
+    
+    const testimonialItemsHTML = testimonialsContent.testimonials.map(testimonial => `
+      <div class="testimonial-card">
+        <div class="testimonial-rating">
+          ${'★'.repeat(testimonial.rating)}${'☆'.repeat(5 - testimonial.rating)}
+        </div>
+        <blockquote>"${testimonial.content}"</blockquote>
+        <div class="testimonial-author">
+          <div class="author-info">
+            <div class="author-name">${testimonial.name}</div>
+            <div class="author-role">${testimonial.role}, ${testimonial.company}</div>
+          </div>
+        </div>
+      </div>
+    `).join('')
+
+    const testimonialsHTML = `
+      <section class="testimonials">
+        <div class="testimonials-container">
+          <div class="testimonials-header">
+            <h2 class="testimonials-title">${testimonialsContent.title}</h2>
+            <p class="testimonials-subtitle">${testimonialsContent.subtitle}</p>
+          </div>
+          <div class="testimonials-grid">
+            ${testimonialItemsHTML}
+          </div>
+        </div>
+      </section>
+    `
+
+    const testimonialsCSS = `
+      .testimonials {
+        padding: 4rem 1rem;
+        background: ${designTokens.colors.neutral}05;
+      }
+      
+      .testimonials-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .testimonials-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+      
+      .testimonials-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+      
+      .testimonials-subtitle {
+        font-size: ${designTokens.typography.scale.lg};
+        color: #6b7280;
+      }
+      
+      .testimonials-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+      }
+      
+      .testimonial-card {
+        background: white;
+        padding: 2rem;
+        border-radius: ${designTokens.borderRadius.lg};
+        box-shadow: ${designTokens.shadows.sm};
+        border: 1px solid ${designTokens.colors.neutral}20;
+      }
+      
+      .testimonial-rating {
+        color: #fbbf24;
+        margin-bottom: 1rem;
+        font-size: 1.125rem;
+      }
+      
+      .testimonial-card blockquote {
+        font-size: ${designTokens.typography.scale.lg};
+        line-height: 1.6;
+        color: #374151;
+        margin: 0 0 1.5rem 0;
+        font-style: italic;
+      }
+      
+      .author-info {
+        text-align: left;
+      }
+      
+      .author-name {
+        font-weight: 600;
+        color: ${designTokens.colors.primary};
+      }
+      
+      .author-role {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+      }
+    `
+
     return {
       id: 'testimonials',
       name: 'Testimonials Section',
       type: 'organism',
-      html: '<section class="testimonials"><h2>What Our Clients Say</h2><div class="testimonials-grid">{{testimonials}}</div></section>',
-      css: '.testimonials { padding: 4rem 1rem; background: #f9fafb; } .testimonials h2 { text-align: center; margin-bottom: 2rem; }'
+      html: testimonialsHTML,
+      css: testimonialsCSS
     }
   }
 
+  /**
+   * Generate team section component
+   */
   private static generateTeamComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const teamContent = industryContent.team
+    
+    const teamMembersHTML = teamContent.members.map(member => `
+      <div class="team-member">
+        <div class="member-photo">
+          <div class="photo-placeholder">${member.name.split(' ').map(n => n[0]).join('')}</div>
+        </div>
+        <div class="member-info">
+          <h3>${member.name}</h3>
+          <div class="member-role">${member.role}</div>
+          <p class="member-description">${member.description}</p>
+          <div class="member-expertise">
+            ${member.expertise.map(skill => `<span class="expertise-tag">${skill}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('')
+
+    const teamHTML = `
+      <section class="team">
+        <div class="team-container">
+          <div class="team-header">
+            <h2 class="team-title">${teamContent.title}</h2>
+            <p class="team-subtitle">${teamContent.subtitle}</p>
+          </div>
+          <div class="team-grid">
+            ${teamMembersHTML}
+          </div>
+        </div>
+      </section>
+    `
+
+    const teamCSS = `
+      .team {
+        padding: 4rem 1rem;
+      }
+      
+      .team-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .team-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+      
+      .team-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+      
+      .team-subtitle {
+        font-size: ${designTokens.typography.scale.lg};
+        color: #6b7280;
+      }
+      
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+      }
+      
+      .team-member {
+        background: white;
+        padding: 2rem;
+        border-radius: ${designTokens.borderRadius.lg};
+        box-shadow: ${designTokens.shadows.sm};
+        text-align: center;
+        border: 1px solid ${designTokens.colors.neutral}20;
+      }
+      
+      .member-photo {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 1.5rem;
+        background: ${designTokens.colors.primary}15;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .photo-placeholder {
+        color: ${designTokens.colors.primary};
+        font-weight: bold;
+        font-size: 2rem;
+      }
+      
+      .member-info h3 {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 0.5rem;
+      }
+      
+      .member-role {
+        color: #6b7280;
+        font-weight: 500;
+        margin-bottom: 1rem;
+      }
+      
+      .member-description {
+        color: #374151;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+        text-align: left;
+      }
+      
+      .member-expertise {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+      }
+      
+      .expertise-tag {
+        background: ${designTokens.colors.primary}10;
+        color: ${designTokens.colors.primary};
+        padding: 0.25rem 0.75rem;
+        border-radius: ${designTokens.borderRadius.sm};
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+    `
+
     return {
       id: 'team',
       name: 'Team Section',
       type: 'organism',
-      html: '<section class="team"><h2>Meet Our Team</h2><div class="team-grid">{{teamMembers}}</div></section>',
-      css: '.team { padding: 4rem 1rem; } .team h2 { text-align: center; margin-bottom: 2rem; }'
+      html: teamHTML,
+      css: teamCSS
     }
   }
 
+  /**
+   * Generate pricing section component
+   */
   private static generatePricingComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const industryContent = getIndustryContent(requirements.industry || 'tech')
+    const pricingContent = industryContent.pricing
+    
+    const pricingPlansHTML = pricingContent.plans.map(plan => `
+      <div class="pricing-card ${plan.highlighted ? 'pricing-highlighted' : ''}">
+        ${plan.highlighted ? '<div class="pricing-badge">Most Popular</div>' : ''}
+        <div class="pricing-header">
+          <h3>${plan.name}</h3>
+          <div class="pricing-price">
+            <span class="price">${plan.price}</span>
+            <span class="period">/${plan.period}</span>
+          </div>
+          <p class="pricing-description">${plan.description}</p>
+        </div>
+        <ul class="pricing-features">
+          ${plan.features.map(feature => `<li>${feature}</li>`).join('')}
+        </ul>
+        <div class="pricing-cta">
+          <button class="pricing-button ${plan.highlighted ? 'button-primary' : 'button-outline'}">
+            ${plan.price === 'Custom' ? 'Contact Sales' : 'Get Started'}
+          </button>
+        </div>
+      </div>
+    `).join('')
+
+    const pricingHTML = `
+      <section class="pricing">
+        <div class="pricing-container">
+          <div class="pricing-header">
+            <h2 class="pricing-title">${pricingContent.title}</h2>
+            <p class="pricing-subtitle">${pricingContent.subtitle}</p>
+          </div>
+          <div class="pricing-grid">
+            ${pricingPlansHTML}
+          </div>
+        </div>
+      </section>
+    `
+
+    const pricingCSS = `
+      .pricing {
+        padding: 4rem 1rem;
+        background: ${designTokens.colors.neutral}05;
+      }
+      
+      .pricing-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .pricing-header {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+      
+      .pricing-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+      
+      .pricing-subtitle {
+        font-size: ${designTokens.typography.scale.lg};
+        color: #6b7280;
+      }
+      
+      .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+        align-items: stretch;
+      }
+      
+      .pricing-card {
+        background: white;
+        border-radius: ${designTokens.borderRadius.lg};
+        box-shadow: ${designTokens.shadows.sm};
+        padding: 2.5rem;
+        text-align: center;
+        position: relative;
+        border: 1px solid ${designTokens.colors.neutral}20;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .pricing-highlighted {
+        border-color: ${designTokens.colors.primary};
+        box-shadow: ${designTokens.shadows.lg};
+        transform: scale(1.02);
+      }
+      
+      .pricing-badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${designTokens.colors.primary};
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: ${designTokens.borderRadius.sm};
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+      
+      .pricing-header h3 {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+        font-size: ${designTokens.typography.scale.xl};
+      }
+      
+      .pricing-price {
+        margin-bottom: 1rem;
+      }
+      
+      .price {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: ${designTokens.colors.primary};
+      }
+      
+      .period {
+        color: #6b7280;
+        font-size: ${designTokens.typography.scale.base};
+      }
+      
+      .pricing-description {
+        color: #6b7280;
+        margin-bottom: 2rem;
+      }
+      
+      .pricing-features {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 2rem 0;
+        text-align: left;
+        flex-grow: 1;
+      }
+      
+      .pricing-features li {
+        padding: 0.75rem 0;
+        color: #374151;
+        position: relative;
+        padding-left: 1.5rem;
+        border-bottom: 1px solid ${designTokens.colors.neutral}15;
+      }
+      
+      .pricing-features li:last-child {
+        border-bottom: none;
+      }
+      
+      .pricing-features li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: ${designTokens.colors.primary};
+        font-weight: bold;
+      }
+      
+      .pricing-button {
+        width: 100%;
+        padding: 0.75rem 1.5rem;
+        border-radius: ${designTokens.borderRadius.md};
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      
+      .button-primary {
+        background: ${designTokens.colors.primary};
+        color: white;
+        border: none;
+      }
+      
+      .button-primary:hover {
+        background: ${designTokens.colors.primary}dd;
+        transform: translateY(-1px);
+      }
+      
+      .button-outline {
+        background: transparent;
+        color: ${designTokens.colors.primary};
+        border: 2px solid ${designTokens.colors.primary};
+      }
+      
+      .button-outline:hover {
+        background: ${designTokens.colors.primary}10;
+      }
+    `
+
     return {
       id: 'pricing',
       name: 'Pricing Section',
       type: 'organism',
-      html: '<section class="pricing"><h2>Pricing Plans</h2><div class="pricing-grid">{{pricingPlans}}</div></section>',
-      css: '.pricing { padding: 4rem 1rem; } .pricing h2 { text-align: center; margin-bottom: 2rem; }'
+      html: pricingHTML,
+      css: pricingCSS
     }
   }
 

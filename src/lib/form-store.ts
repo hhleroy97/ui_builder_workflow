@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { ProjectRequirements } from '@/types'
 
 interface FormStep {
@@ -10,6 +9,9 @@ interface FormStep {
 }
 
 interface FormState {
+  // Hydration control
+  isHydrated: boolean
+  
   // Form navigation
   currentStep: number
   steps: FormStep[]
@@ -19,6 +21,7 @@ interface FormState {
   formData: Partial<ProjectRequirements>
   
   // Actions
+  setHydrated: () => void
   setCurrentStep: (step: number) => void
   nextStep: () => void
   previousStep: () => void
@@ -79,13 +82,16 @@ const initialFormData: Partial<ProjectRequirements> = {
   specialFeatures: []
 }
 
-export const useFormStore = create<FormState>()(
-  persist(
-    (set, get) => ({
-      currentStep: 0,
-      steps: initialSteps,
-      isComplete: false,
-      formData: initialFormData,
+export const useFormStore = create<FormState>()((set, get) => ({
+  isHydrated: false,
+  currentStep: 0,
+  steps: initialSteps,
+  isComplete: false,
+  formData: initialFormData,
+
+      setHydrated: () => {
+        set({ isHydrated: true })
+      },
 
       setCurrentStep: (step: number) => {
         const { canNavigateToStep } = get()
@@ -157,24 +163,4 @@ export const useFormStore = create<FormState>()(
         
         return true
       }
-    }),
-    {
-      name: 'ui-builder-form-storage',
-      partialize: (state) => ({
-        formData: state.formData,
-        steps: state.steps,
-        currentStep: state.currentStep
-      }),
-      // Skip hydration to prevent SSR/client mismatch
-      skipHydration: true,
-      // Use createJSONStorage for better hydration handling
-      storage: createJSONStorage(() => 
-        typeof window !== 'undefined' ? localStorage : {
-          getItem: () => null,
-          setItem: () => {},
-          removeItem: () => {}
-        }
-      ),
-    }
-  )
-)
+}))

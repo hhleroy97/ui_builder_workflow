@@ -36,8 +36,7 @@ export function StepIndicator({
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
                   {
-                    "bg-primary text-primary-foreground": isActive,
-                    "bg-primary text-primary-foreground": isCompleted,
+                    "bg-primary text-primary-foreground": isActive || isCompleted,
                     "border-2 border-muted text-muted-foreground bg-background": 
                       !isActive && !isCompleted,
                     "cursor-pointer hover:bg-muted": isClickable,

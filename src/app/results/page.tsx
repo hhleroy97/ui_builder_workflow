@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useHydration } from "@/lib/hooks/use-hydration"
+import { ClientOnly } from "@/components/client-only"
+import { ComponentPreview } from "@/components/organisms/component-preview"
 import { GeneratedTemplate } from "@/types"
 import { TemplateService } from "@/lib/template-service"
+import { FigmaExportService } from "@/lib/figma/figma-export-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,40 +20,70 @@ import {
   ExternalLink,
   Loader2,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Figma,
+  Package
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export default function ResultsPage() {
+function ResultsPageContent() {
   const [template, setTemplate] = useState<GeneratedTemplate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [figmaExporting, setFigmaExporting] = useState(false)
+  const [figmaExportResult, setFigmaExportResult] = useState<any>(null)
   
-  const isHydrated = useHydration()
   const searchParams = useSearchParams()
   const router = useRouter()
 
   useEffect(() => {
-    // Only process URL params after hydration to prevent SSR/client mismatch
-    if (!isHydrated) return
-
     const templateData = searchParams.get('template')
+    const templateId = searchParams.get('id')
+    
+    console.log('Results page - templateData exists:', !!templateData)
+    console.log('Results page - templateId exists:', !!templateId)
+    console.log('Results page - templateData length:', templateData?.length)
     
     if (templateData) {
+      // Try URL parameter first
       try {
+        console.log('Results page - Attempting to parse template data from URL...')
         const parsedTemplate = JSON.parse(decodeURIComponent(templateData))
+        console.log('Results page - Template parsed successfully from URL:', parsedTemplate.name)
         setTemplate(parsedTemplate)
         setLoading(false)
+        return
       } catch (err) {
-        setError('Failed to load template data')
-        setLoading(false)
+        console.error('Results page - URL parse error:', err)
+        console.error('Results page - Template data preview:', templateData.substring(0, 200))
       }
-    } else {
-      setError('No template data found')
-      setLoading(false)
     }
-  }, [searchParams, isHydrated])
+    
+    if (templateId) {
+      // Try sessionStorage if we have an ID
+      try {
+        console.log('Results page - Attempting to load from sessionStorage...')
+        const storedTemplate = sessionStorage.getItem('generated-template')
+        if (storedTemplate) {
+          const parsedTemplate = JSON.parse(storedTemplate)
+          console.log('Results page - Template parsed successfully from sessionStorage:', parsedTemplate.name)
+          setTemplate(parsedTemplate)
+          setLoading(false)
+          return
+        } else {
+          console.error('Results page - No template found in sessionStorage')
+        }
+      } catch (err) {
+        console.error('Results page - SessionStorage parse error:', err)
+      }
+    }
+    
+    // If we get here, nothing worked
+    console.error('Results page - No template data found in URL or sessionStorage')
+    setError('No template data found')
+    setLoading(false)
+  }, [searchParams])
 
   const handleCopy = async (content: string, type: string) => {
     try {
@@ -89,6 +121,51 @@ export default function ResultsPage() {
 
   const handleStartOver = () => {
     router.push('/generator')
+  }
+
+  const handleExportToFigma = async () => {
+    if (!template) return
+    
+    try {
+      setFigmaExporting(true)
+      const result = await FigmaExportService.exportTemplate(template)
+      setFigmaExportResult(result)
+      
+      if (result.success && result.pluginDownloadUrl) {
+        // Create download link for plugin
+        const link = document.createElement('a')
+        link.href = result.pluginDownloadUrl
+        link.download = `${template.name}-figma-plugin.json`
+        link.click()
+      }
+    } catch (error) {
+      console.error('Figma export failed:', error)
+      setFigmaExportResult({
+        success: false,
+        error: 'Failed to export to Figma'
+      })
+    } finally {
+      setFigmaExporting(false)
+    }
+  }
+
+  const handleQuickFigmaExport = async () => {
+    if (!template) return
+    
+    try {
+      const simpleExport = await FigmaExportService.createSimpleExport(template)
+      
+      // Copy instructions to clipboard
+      await navigator.clipboard.writeText(simpleExport.instructions)
+      
+      // Open Figma plugin in new tab
+      window.open(simpleExport.figmaUrl, '_blank')
+      
+      setCopied('figma-instructions')
+      setTimeout(() => setCopied(null), 3000)
+    } catch (error) {
+      console.error('Quick Figma export failed:', error)
+    }
   }
 
   if (loading) {
@@ -175,9 +252,109 @@ export default function ResultsPage() {
                 <Palette className="h-4 w-4" />
                 Design Tokens
               </Button>
+              
+              <Button 
+                onClick={handleExportToFigma} 
+                variant="outline" 
+                className="flex items-center gap-2"
+                disabled={figmaExporting}
+              >
+                {figmaExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Figma className="h-4 w-4" />
+                )}
+                {figmaExporting ? 'Exporting...' : 'Export to Figma'}
+              </Button>
+              
+              <Button onClick={handleQuickFigmaExport} variant="outline" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Quick Figma Export
+              </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Figma Export Results */}
+        {figmaExportResult && (
+          <Card className="mb-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Figma className="h-5 w-5" />
+                Figma Export
+              </CardTitle>
+              <CardDescription>
+                {figmaExportResult.success 
+                  ? "Your template is ready for Figma!" 
+                  : "There was an issue with the export"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {figmaExportResult.success ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Plugin created successfully!</span>
+                  </div>
+                  
+                  <div className="bg-muted/30 p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">Next Steps:</h4>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                      <li>Download the plugin file (should start automatically)</li>
+                      <li>Open Figma and go to Menu → Plugins → Development</li>
+                      <li>Click "Import plugin from manifest"</li>
+                      <li>Select the downloaded manifest.json file</li>
+                      <li>Run the plugin to import your components</li>
+                    </ol>
+                  </div>
+                  
+                  {figmaExportResult.instructions && (
+                    <details className="bg-muted/30 p-4 rounded-lg">
+                      <summary className="font-medium cursor-pointer mb-2">
+                        View Detailed Instructions
+                      </summary>
+                      <div className="text-sm text-muted-foreground whitespace-pre-line">
+                        {figmaExportResult.instructions}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Export failed</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {figmaExportResult.error || 'An unexpected error occurred during export.'}
+                  </p>
+                  <Button 
+                    onClick={() => setFigmaExportResult(null)} 
+                    variant="outline" 
+                    size="sm"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Success message for quick export */}
+        {copied === 'figma-instructions' && (
+          <Card className="mb-8 border-0 shadow-lg bg-green-50 border-green-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-green-700">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">Instructions copied to clipboard!</span>
+              </div>
+              <p className="text-sm text-green-600 mt-2">
+                A Figma plugin tab should have opened. Follow the copied instructions to import your template.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           {/* Template Code */}
@@ -280,15 +457,35 @@ export default function ResultsPage() {
           </Card>
         </div>
 
-        {/* Components List */}
+        {/* Interactive Component Previews */}
+        <div className="mb-8 space-y-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Interactive Component Previews</h2>
+            <p className="text-muted-foreground mb-6">
+              Preview, edit, and customize each generated component
+            </p>
+          </div>
+          
+          {template.components.map((component) => (
+            <div key={component.id} id={`component-${component.id}`}>
+              <ComponentPreview
+                component={component}
+                designTokens={template.designTokens}
+                className="mb-6"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Components Summary */}
         <Card className="mb-8 border-0 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Generated Components
+              Components Summary
             </CardTitle>
             <CardDescription>
-              All components included in your template
+              Overview of all generated components
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -296,7 +493,13 @@ export default function ResultsPage() {
               {template.components.map((component) => (
                 <div
                   key={component.id}
-                  className="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => {
+                    const element = document.getElementById(`component-${component.id}`)
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h5 className="font-medium text-sm">{component.name}</h5>
@@ -309,6 +512,9 @@ export default function ResultsPage() {
                       {component.variants.length} variant{component.variants.length > 1 ? 's' : ''}
                     </p>
                   )}
+                  <p className="text-xs text-primary mt-1">
+                    Click to view component →
+                  </p>
                 </div>
               ))}
             </div>
@@ -324,7 +530,7 @@ export default function ResultsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="text-center p-4 border rounded-lg">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Download className="h-6 w-6 text-primary" />
@@ -337,9 +543,19 @@ export default function ResultsPage() {
 
               <div className="text-center p-4 border rounded-lg">
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Figma className="h-6 w-6 text-primary" />
+                </div>
+                <h4 className="font-medium mb-2">2. Export to Figma</h4>
+                <p className="text-sm text-muted-foreground">
+                  Create a Figma plugin to import components and design system
+                </p>
+              </div>
+
+              <div className="text-center p-4 border rounded-lg">
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <Palette className="h-6 w-6 text-primary" />
                 </div>
-                <h4 className="font-medium mb-2">2. Customize Content</h4>
+                <h4 className="font-medium mb-2">3. Customize Content</h4>
                 <p className="text-sm text-muted-foreground">
                   Replace placeholder text and images with your content
                 </p>
@@ -349,9 +565,9 @@ export default function ResultsPage() {
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
                   <ExternalLink className="h-6 w-6 text-primary" />
                 </div>
-                <h4 className="font-medium mb-2">3. Deploy & Share</h4>
+                <h4 className="font-medium mb-2">4. Deploy & Share</h4>
                 <p className="text-sm text-muted-foreground">
-                  Upload to your hosting provider or sell on template marketplaces
+                  Sell on Figma Community or template marketplaces
                 </p>
               </div>
             </div>
@@ -365,5 +581,22 @@ export default function ResultsPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function ResultsPage() {
+  return (
+    <ClientOnly 
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading results...</p>
+          </div>
+        </div>
+      }
+    >
+      <ResultsPageContent />
+    </ClientOnly>
   )
 }

@@ -22,16 +22,19 @@ export function MultiStepForm({ children, onComplete, className }: MultiStepForm
     previousStep,
     setCurrentStep,
     getProgress,
-    canNavigateToStep
+    canNavigateToStep,
+    isHydrated
   } = useFormStore()
 
   // Use local state for progress to prevent hydration mismatch
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    // Update progress client-side only
-    setProgress(getProgress())
-  }, [getProgress, steps])
+    // Update progress client-side only, but only after hydration
+    if (isHydrated) {
+      setProgress(getProgress())
+    }
+  }, [getProgress, steps, isHydrated])
 
   const currentStepData = steps[currentStep]
   const isFirstStep = currentStep === 0

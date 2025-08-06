@@ -90,6 +90,12 @@ export function IndustryPurposeStep() {
     debouncedUpdateFormData({ targetAudience: value })
   }
 
+  const handleBusinessNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setBusinessName(value)
+    debouncedUpdateFormData({ businessName: value })
+  }
+
   useEffect(() => {
     if (selectedIndustry && selectedPurpose && selectedAudience) {
       completeStep('industry-purpose')
@@ -209,7 +215,7 @@ export function IndustryPurposeStep() {
               <Input
                 id="businessName"
                 value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                onChange={handleBusinessNameChange}
                 placeholder="e.g., Acme Corporation, My Startup"
               />
               <p className="text-xs text-muted-foreground">

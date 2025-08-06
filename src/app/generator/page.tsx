@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MultiStepForm } from "@/components/organisms/multi-step-form"
-import { HydrationWrapper } from "@/components/organisms/hydration-wrapper"
 import { useFormStore } from "@/lib/form-store"
 import { TemplateService } from "@/lib/template-service"
 import { ProjectTypeStep } from "./steps/project-type"
@@ -20,25 +19,60 @@ export default function GeneratorPage() {
   const currentStep = useFormStore((state) => state.currentStep)
   const formData = useFormStore((state) => state.formData)
   const resetForm = useFormStore((state) => state.resetForm)
+  const isHydrated = useFormStore((state) => state.isHydrated)
+  const setHydrated = useFormStore((state) => state.setHydrated)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Handle hydration
+  useEffect(() => {
+    setHydrated()
+  }, [])
 
   const handleComplete = async () => {
     try {
       setGenerating(true)
       setError(null)
 
+      console.log('Starting template generation with form data:', formData)
+
+      // Validate that we have minimum required data
+      if (!formData.projectType) {
+        setError('Please select a project type')
+        return
+      }
+
+      if (!formData.industry) {
+        setError('Please select an industry')
+        return
+      }
+
       // Generate the template
       const template = await TemplateService.generateTemplate(formData)
       
-      // Navigate to results page with template data
+      console.log('Template generated successfully:', template)
+      
+      // Store template in sessionStorage to avoid URL length limits
       const templateParam = encodeURIComponent(JSON.stringify(template))
-      router.push(`/results?template=${templateParam}`)
+      console.log('Generator - Template param length:', templateParam.length)
+      console.log('Generator - Full URL length would be:', `/results?template=${templateParam}`.length)
+      
+      if (templateParam.length > 8000) {
+        console.warn('Generator - URL too long, using sessionStorage instead')
+        // Use sessionStorage for large templates
+        sessionStorage.setItem('generated-template', JSON.stringify(template))
+        router.push(`/results?id=${template.id}`)
+      } else {
+        // Use URL parameter for smaller templates
+        router.push(`/results?template=${templateParam}`)
+      }
 
     } catch (err) {
       console.error('Template generation failed:', err)
-      setError(err instanceof Error ? err.message : 'Failed to generate template')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate template'
+      console.error('Full error details:', err)
+      setError(errorMessage)
     } finally {
       setGenerating(false)
     }
@@ -71,6 +105,18 @@ export default function GeneratorPage() {
       default:
         return <ProjectTypeStep />
     }
+  }
+
+  // Wait for hydration to prevent SSR mismatch
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading form...</p>
+        </div>
+      </div>
+    )
   }
 
   // Show generating state
@@ -126,10 +172,8 @@ export default function GeneratorPage() {
   }
 
   return (
-    <HydrationWrapper>
-      <MultiStepForm onComplete={handleComplete}>
-        {renderCurrentStep()}
-      </MultiStepForm>
-    </HydrationWrapper>
+    <MultiStepForm onComplete={handleComplete}>
+      {renderCurrentStep()}
+    </MultiStepForm>
   )
 }

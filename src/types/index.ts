@@ -50,6 +50,7 @@ export interface ProjectRequirements {
   industry: string
   purpose: string
   targetAudience: string
+  businessName?: string
   styleDirection: 'modern' | 'minimal' | 'bold' | 'classic' | 'playful'
   colorPreferences: {
     type: 'brand' | 'mood' | 'ai-suggested'

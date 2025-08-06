@@ -4,7 +4,7 @@ export class TemplateService {
   /**
    * Generate a template by calling the API
    */
-  static async generateTemplate(requirements: ProjectRequirements): Promise<GeneratedTemplate> {
+  static async generateTemplate(requirements: Partial<ProjectRequirements>): Promise<GeneratedTemplate> {
     const response = await fetch('/api/generate-template', {
       method: 'POST',
       headers: {
@@ -83,12 +83,67 @@ export class TemplateService {
    * Preview template in new window
    */
   static previewTemplate(template: GeneratedTemplate): void {
-    const newWindow = window.open('', '_blank')
+    console.log('Attempting to preview template:', template.name)
+    console.log('Template HTML length:', template.html?.length)
+    console.log('Template HTML preview:', template.html?.substring(0, 500))
+    
+    // Check if popup blockers are preventing the window
+    const newWindow = window.open('', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes')
+    
     if (newWindow) {
-      newWindow.document.write(template.html)
-      newWindow.document.close()
+      try {
+        // Ensure the HTML is complete and well-formed
+        let htmlContent = template.html
+        
+        // Add components to the body if it's empty
+        if (htmlContent.includes('<body>') && htmlContent.includes('</body>')) {
+          const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+          if (bodyMatch && bodyMatch[1].trim() === '') {
+            // Body is empty, add the components
+            const componentsHtml = template.components
+              .filter(comp => comp.html && comp.html.trim() !== '')
+              .map(comp => comp.html)
+              .join('\n\n')
+            
+            if (componentsHtml) {
+              htmlContent = htmlContent.replace(
+                /<body[^>]*>[\s\S]*?<\/body>/i,
+                `<body>\n${componentsHtml}\n</body>`
+              )
+            } else {
+              // Fallback content
+              htmlContent = htmlContent.replace(
+                /<body[^>]*>[\s\S]*?<\/body>/i,
+                `<body>
+                  <div style="padding: 2rem; text-align: center; font-family: Arial, sans-serif;">
+                    <h1 style="color: #333; margin-bottom: 1rem;">${template.name}</h1>
+                    <p style="color: #666; margin-bottom: 2rem;">${template.description}</p>
+                    <div style="background: #f5f5f5; padding: 2rem; border-radius: 8px; max-width: 600px; margin: 0 auto;">
+                      <h2>Template Components Generated:</h2>
+                      <ul style="text-align: left; margin-top: 1rem;">
+                        ${template.components.map(comp => `<li>${comp.name} (${comp.type})</li>`).join('')}
+                      </ul>
+                    </div>
+                  </div>
+                </body>`
+              )
+            }
+          }
+        }
+        
+        console.log('Writing HTML to new window...')
+        newWindow.document.write(htmlContent)
+        newWindow.document.close()
+        console.log('Preview window opened successfully')
+        
+      } catch (error) {
+        console.error('Error writing to preview window:', error)
+        newWindow.close()
+        alert('Error opening preview. Please check the console for details.')
+      }
     } else {
-      alert('Please allow popups to preview the template')
+      console.error('Failed to open preview window - likely blocked by popup blocker')
+      alert('Please allow popups to preview the template, or check if popup blockers are enabled')
     }
   }
 
