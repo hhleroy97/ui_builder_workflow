@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { useHydration } from "@/lib/hooks/use-hydration"
 import { GeneratedTemplate } from "@/types"
 import { TemplateService } from "@/lib/template-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,10 +28,14 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   
+  const isHydrated = useHydration()
   const searchParams = useSearchParams()
   const router = useRouter()
 
   useEffect(() => {
+    // Only process URL params after hydration to prevent SSR/client mismatch
+    if (!isHydrated) return
+
     const templateData = searchParams.get('template')
     
     if (templateData) {
@@ -46,7 +51,7 @@ export default function ResultsPage() {
       setError('No template data found')
       setLoading(false)
     }
-  }, [searchParams])
+  }, [searchParams, isHydrated])
 
   const handleCopy = async (content: string, type: string) => {
     try {

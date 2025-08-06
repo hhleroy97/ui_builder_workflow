@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { ProjectRequirements } from '@/types'
 
 interface FormStep {
@@ -165,8 +165,16 @@ export const useFormStore = create<FormState>()(
         steps: state.steps,
         currentStep: state.currentStep
       }),
-      // Reduce persistence frequency to prevent input lag
-      skipHydration: false,
+      // Skip hydration to prevent SSR/client mismatch
+      skipHydration: true,
+      // Use createJSONStorage for better hydration handling
+      storage: createJSONStorage(() => 
+        typeof window !== 'undefined' ? localStorage : {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {}
+        }
+      ),
     }
   )
 )

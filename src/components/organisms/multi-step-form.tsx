@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode } from "react"
+import { ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProgressBar } from "@/components/molecules/progress-bar"
@@ -25,10 +25,17 @@ export function MultiStepForm({ children, onComplete, className }: MultiStepForm
     canNavigateToStep
   } = useFormStore()
 
+  // Use local state for progress to prevent hydration mismatch
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    // Update progress client-side only
+    setProgress(getProgress())
+  }, [getProgress, steps])
+
   const currentStepData = steps[currentStep]
   const isFirstStep = currentStep === 0
   const isLastStep = currentStep === steps.length - 1
-  const progress = getProgress()
 
   const handleNext = () => {
     if (isLastStep && onComplete) {

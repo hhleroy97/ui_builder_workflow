@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { MultiStepForm } from "@/components/organisms/multi-step-form"
+import { HydrationWrapper } from "@/components/organisms/hydration-wrapper"
 import { useFormStore } from "@/lib/form-store"
 import { TemplateService } from "@/lib/template-service"
 import { ProjectTypeStep } from "./steps/project-type"
@@ -125,8 +126,10 @@ export default function GeneratorPage() {
   }
 
   return (
-    <MultiStepForm onComplete={handleComplete}>
-      {renderCurrentStep()}
-    </MultiStepForm>
+    <HydrationWrapper>
+      <MultiStepForm onComplete={handleComplete}>
+        {renderCurrentStep()}
+      </MultiStepForm>
+    </HydrationWrapper>
   )
 }
