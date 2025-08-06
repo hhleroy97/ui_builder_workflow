@@ -460,13 +460,296 @@ export class TemplateGenerator {
       (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1)
   }
 
-  // Placeholder methods for other components - would be implemented similarly
-  private static generateAboutComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generateServicesComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generateContactComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generatePortfolioComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generateTestimonialsComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generateTeamComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static generatePricingComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition | null { return null }
-  private static async generateInteractiveComponent(elementId: string, requirements: ProjectRequirements, designTokens: DesignTokens): Promise<ComponentDefinition | null> { return null }
+  /**
+   * Generate about section component
+   */
+  private static generateAboutComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const aboutHTML = `
+      <section class="about">
+        <div class="about-container">
+          <div class="about-content">
+            <h2 class="about-title">About Us</h2>
+            <p class="about-description">{{description}}</p>
+            <div class="about-features">
+              <div class="feature">
+                <h3>{{feature1Title}}</h3>
+                <p>{{feature1Description}}</p>
+              </div>
+              <div class="feature">
+                <h3>{{feature2Title}}</h3>
+                <p>{{feature2Description}}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    `
+
+    const aboutCSS = `
+      .about {
+        padding: 4rem 1rem;
+        background: ${designTokens.colors.neutral}10;
+      }
+      
+      .about-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .about-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1.5rem;
+        text-align: center;
+      }
+      
+      .about-description {
+        font-size: ${designTokens.typography.scale.lg};
+        text-align: center;
+        margin-bottom: 3rem;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      
+      .about-features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+      }
+      
+      .feature h3 {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+    `
+
+    return {
+      id: 'about',
+      name: 'About Section',
+      type: 'organism',
+      html: aboutHTML,
+      css: aboutCSS
+    }
+  }
+
+  /**
+   * Generate contact section component
+   */
+  private static generateContactComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const contactHTML = `
+      <section class="contact">
+        <div class="contact-container">
+          <div class="contact-content">
+            <h2 class="contact-title">Get In Touch</h2>
+            <p class="contact-description">{{contactDescription}}</p>
+            <div class="contact-form">
+              <form>
+                <div class="form-group">
+                  <label for="name">Name</label>
+                  <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                  <label for="email">Email</label>
+                  <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                  <label for="message">Message</label>
+                  <textarea id="message" name="message" rows="5" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Send Message</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    `
+
+    const contactCSS = `
+      .contact {
+        padding: 4rem 1rem;
+        background: ${designTokens.colors.primary}05;
+      }
+      
+      .contact-container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      
+      .contact-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+        text-align: center;
+      }
+      
+      .contact-description {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #6b7280;
+      }
+      
+      .form-group {
+        margin-bottom: 1.5rem;
+      }
+      
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: ${designTokens.typography.weights.medium};
+        color: ${designTokens.colors.primary};
+      }
+      
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e5e7eb;
+        border-radius: ${designTokens.borderRadius.md};
+        font-family: ${designTokens.typography.fontPairings.body};
+      }
+      
+      .form-group input:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: ${designTokens.colors.primary};
+      }
+    `
+
+    return {
+      id: 'contact',
+      name: 'Contact Section',
+      type: 'organism',
+      html: contactHTML,
+      css: contactCSS
+    }
+  }
+
+  /**
+   * Generate services section component
+   */
+  private static generateServicesComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    const servicesHTML = `
+      <section class="services">
+        <div class="services-container">
+          <h2 class="services-title">Our Services</h2>
+          <div class="services-grid">
+            <div class="service-card">
+              <h3>{{service1Title}}</h3>
+              <p>{{service1Description}}</p>
+            </div>
+            <div class="service-card">
+              <h3>{{service2Title}}</h3>
+              <p>{{service2Description}}</p>
+            </div>
+            <div class="service-card">
+              <h3>{{service3Title}}</h3>
+              <p>{{service3Description}}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    `
+
+    const servicesCSS = `
+      .services {
+        padding: 4rem 1rem;
+      }
+      
+      .services-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      
+      .services-title {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        font-size: ${designTokens.typography.scale['3xl']};
+        color: ${designTokens.colors.primary};
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+      
+      .services-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+      }
+      
+      .service-card {
+        padding: 2rem;
+        background: white;
+        border-radius: ${designTokens.borderRadius.lg};
+        box-shadow: ${designTokens.shadows.md};
+        text-align: center;
+      }
+      
+      .service-card h3 {
+        font-family: ${designTokens.typography.fontPairings.heading};
+        color: ${designTokens.colors.primary};
+        margin-bottom: 1rem;
+      }
+    `
+
+    return {
+      id: 'services',
+      name: 'Services Section',
+      type: 'organism',
+      html: servicesHTML,
+      css: servicesCSS
+    }
+  }
+
+  // Simple placeholder implementations for other components
+  private static generatePortfolioComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    return {
+      id: 'portfolio',
+      name: 'Portfolio Section',
+      type: 'organism',
+      html: '<section class="portfolio"><h2>Portfolio</h2><div class="portfolio-grid">{{portfolioItems}}</div></section>',
+      css: '.portfolio { padding: 4rem 1rem; } .portfolio h2 { text-align: center; margin-bottom: 2rem; }'
+    }
+  }
+
+  private static generateTestimonialsComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    return {
+      id: 'testimonials',
+      name: 'Testimonials Section',
+      type: 'organism',
+      html: '<section class="testimonials"><h2>What Our Clients Say</h2><div class="testimonials-grid">{{testimonials}}</div></section>',
+      css: '.testimonials { padding: 4rem 1rem; background: #f9fafb; } .testimonials h2 { text-align: center; margin-bottom: 2rem; }'
+    }
+  }
+
+  private static generateTeamComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    return {
+      id: 'team',
+      name: 'Team Section',
+      type: 'organism',
+      html: '<section class="team"><h2>Meet Our Team</h2><div class="team-grid">{{teamMembers}}</div></section>',
+      css: '.team { padding: 4rem 1rem; } .team h2 { text-align: center; margin-bottom: 2rem; }'
+    }
+  }
+
+  private static generatePricingComponent(requirements: ProjectRequirements, designTokens: DesignTokens): ComponentDefinition {
+    return {
+      id: 'pricing',
+      name: 'Pricing Section',
+      type: 'organism',
+      html: '<section class="pricing"><h2>Pricing Plans</h2><div class="pricing-grid">{{pricingPlans}}</div></section>',
+      css: '.pricing { padding: 4rem 1rem; } .pricing h2 { text-align: center; margin-bottom: 2rem; }'
+    }
+  }
+
+  private static async generateInteractiveComponent(elementId: string, requirements: ProjectRequirements, designTokens: DesignTokens): Promise<ComponentDefinition | null> {
+    // Simple implementation for interactive components
+    switch (elementId) {
+      case 'contact_form':
+        return this.generateContactComponent(requirements, designTokens)
+      default:
+        return null
+    }
+  }
 }

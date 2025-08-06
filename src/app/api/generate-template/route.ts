@@ -14,9 +14,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Add default values for missing fields
+    const completeRequirements: ProjectRequirements = {
+      projectType: requirements.projectType,
+      industry: requirements.industry,
+      purpose: requirements.purpose || 'Build brand awareness',
+      targetAudience: requirements.targetAudience || 'General consumers (B2C)',
+      styleDirection: requirements.styleDirection || 'modern',
+      colorPreferences: requirements.colorPreferences || { type: 'ai-suggested' },
+      typographyStyle: requirements.typographyStyle || 'professional',
+      requiredSections: requirements.requiredSections || ['hero', 'about', 'contact'],
+      interactiveElements: requirements.interactiveElements || [],
+      specialFeatures: requirements.specialFeatures || [],
+      devicePriority: requirements.devicePriority || 'mobile-first',
+      accessibilityLevel: requirements.accessibilityLevel || 'enhanced'
+    }
+
     // Generate the template
-    console.log('Generating template for requirements:', requirements)
-    const template = await TemplateGenerator.generateTemplate(requirements)
+    console.log('Generating template for requirements:', completeRequirements)
+    const template = await TemplateGenerator.generateTemplate(completeRequirements)
+
+    console.log('Template generated successfully:', {
+      id: template.id,
+      name: template.name,
+      componentsCount: template.components.length,
+      htmlLength: template.html.length,
+      cssLength: template.css.length
+    })
 
     return NextResponse.json({
       success: true,
@@ -25,11 +49,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Template generation error:', error)
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available')
     
     return NextResponse.json(
       { 
         error: 'Failed to generate template',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
       },
       { status: 500 }
     )
