@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { useEffect, useState, useCallback } from "react"
 import { useFormStore } from "@/lib/form-store"
+import { debounce } from "@/lib/utils/debounce"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -62,48 +60,41 @@ const audiences = [
   'Technical/Developer audience'
 ]
 
-const schema = z.object({
-  industry: z.string().min(1, "Please select an industry"),
-  purpose: z.string().min(1, "Please select a primary purpose"),
-  targetAudience: z.string().min(1, "Please select your target audience"),
-  businessName: z.string().optional(),
-  additionalContext: z.string().optional()
-})
-
-type FormData = z.infer<typeof schema>
-
 export function IndustryPurposeStep() {
   const { formData, updateFormData, completeStep } = useFormStore()
-  
-  const {
-    register,
-    watch,
-    setValue,
-    formState: { errors, isValid }
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      industry: formData.industry || "",
-      purpose: formData.purpose || "",
-      targetAudience: formData.targetAudience || "",
-      businessName: "",
-      additionalContext: ""
-    },
-    mode: "onChange"
-  })
+  const [businessName, setBusinessName] = useState("")
 
-  const watchedValues = watch()
+  // Local state for form values to prevent re-render issues
+  const [selectedIndustry, setSelectedIndustry] = useState(formData.industry || "")
+  const [selectedPurpose, setSelectedPurpose] = useState(formData.purpose || "")
+  const [selectedAudience, setSelectedAudience] = useState(formData.targetAudience || "")
+
+  // Debounced store updates to prevent input lag
+  const debouncedUpdateFormData = useCallback(
+    debounce((data: any) => updateFormData(data), 300),
+    [updateFormData]
+  )
+
+  const handleIndustryChange = (value: string) => {
+    setSelectedIndustry(value)
+    debouncedUpdateFormData({ industry: value })
+  }
+
+  const handlePurposeChange = (value: string) => {
+    setSelectedPurpose(value)
+    debouncedUpdateFormData({ purpose: value })
+  }
+
+  const handleAudienceChange = (value: string) => {
+    setSelectedAudience(value)
+    debouncedUpdateFormData({ targetAudience: value })
+  }
 
   useEffect(() => {
-    if (isValid && watchedValues.industry && watchedValues.purpose && watchedValues.targetAudience) {
-      updateFormData({
-        industry: watchedValues.industry,
-        purpose: watchedValues.purpose,
-        targetAudience: watchedValues.targetAudience
-      })
+    if (selectedIndustry && selectedPurpose && selectedAudience) {
       completeStep('industry-purpose')
     }
-  }, [watchedValues, isValid, updateFormData, completeStep])
+  }, [selectedIndustry, selectedPurpose, selectedAudience, completeStep])
 
   const getIndustryIcon = (industryId: string) => {
     const industry = industries.find(i => i.id === industryId)
@@ -130,8 +121,8 @@ export function IndustryPurposeStep() {
           </CardHeader>
           <CardContent>
             <Select
-              value={watchedValues.industry}
-              onValueChange={(value) => setValue('industry', value)}
+              value={selectedIndustry}
+              onValueChange={handleIndustryChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select your industry" />
@@ -150,9 +141,6 @@ export function IndustryPurposeStep() {
                 })}
               </SelectContent>
             </Select>
-            {errors.industry && (
-              <p className="text-sm text-destructive mt-2">{errors.industry.message}</p>
-            )}
           </CardContent>
         </Card>
 
@@ -166,8 +154,8 @@ export function IndustryPurposeStep() {
           </CardHeader>
           <CardContent>
             <Select
-              value={watchedValues.purpose}
-              onValueChange={(value) => setValue('purpose', value)}
+              value={selectedPurpose}
+              onValueChange={handlePurposeChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select your main goal" />
@@ -180,9 +168,6 @@ export function IndustryPurposeStep() {
                 ))}
               </SelectContent>
             </Select>
-            {errors.purpose && (
-              <p className="text-sm text-destructive mt-2">{errors.purpose.message}</p>
-            )}
           </CardContent>
         </Card>
 
@@ -196,8 +181,8 @@ export function IndustryPurposeStep() {
           </CardHeader>
           <CardContent>
             <Select
-              value={watchedValues.targetAudience}
-              onValueChange={(value) => setValue('targetAudience', value)}
+              value={selectedAudience}
+              onValueChange={handleAudienceChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select your target audience" />
@@ -210,9 +195,6 @@ export function IndustryPurposeStep() {
                 ))}
               </SelectContent>
             </Select>
-            {errors.targetAudience && (
-              <p className="text-sm text-destructive mt-2">{errors.targetAudience.message}</p>
-            )}
           </CardContent>
         </Card>
 
@@ -226,7 +208,8 @@ export function IndustryPurposeStep() {
               <Label htmlFor="businessName">Company or Project Name</Label>
               <Input
                 id="businessName"
-                {...register('businessName')}
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
                 placeholder="e.g., Acme Corporation, My Startup"
               />
               <p className="text-xs text-muted-foreground">
@@ -238,13 +221,13 @@ export function IndustryPurposeStep() {
       </div>
 
       {/* Summary Preview */}
-      {watchedValues.industry && watchedValues.purpose && watchedValues.targetAudience && (
+      {selectedIndustry && selectedPurpose && selectedAudience && (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">
                 {(() => {
-                  const Icon = getIndustryIcon(watchedValues.industry)
+                  const Icon = getIndustryIcon(selectedIndustry)
                   return <Icon className="h-5 w-5 text-primary" />
                 })()}
               </div>
@@ -252,10 +235,10 @@ export function IndustryPurposeStep() {
                 <h4 className="font-medium">Perfect! Here's what we understand:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Industry: <span className="text-foreground font-medium">
-                    {industries.find(i => i.id === watchedValues.industry)?.label}
+                    {industries.find(i => i.id === selectedIndustry)?.label}
                   </span></li>
-                  <li>• Goal: <span className="text-foreground font-medium">{watchedValues.purpose}</span></li>
-                  <li>• Audience: <span className="text-foreground font-medium">{watchedValues.targetAudience}</span></li>
+                  <li>• Goal: <span className="text-foreground font-medium">{selectedPurpose}</span></li>
+                  <li>• Audience: <span className="text-foreground font-medium">{selectedAudience}</span></li>
                 </ul>
                 <p className="text-xs text-primary font-medium mt-2">
                   ✓ We'll use this to recommend industry-appropriate colors and design patterns

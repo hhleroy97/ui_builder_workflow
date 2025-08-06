@@ -164,7 +164,9 @@ export const useFormStore = create<FormState>()(
         formData: state.formData,
         steps: state.steps,
         currentStep: state.currentStep
-      })
+      }),
+      // Reduce persistence frequency to prevent input lag
+      skipHydration: false,
     }
   )
 )
